@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
+const { swaggerUi, swaggerSpec } = require('./swagger');
 // xyz 123
 // Load environment variables from .env
 require('dotenv').config();
@@ -9,7 +10,7 @@ const port = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
-
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 // PostgreSQL DB connection
 // const pool = new Pool({
 //   user: 'postgres',         // Replace with your DB user
@@ -38,6 +39,26 @@ pool.connect((err, client, release) => {
   release();
 });
 
+app.get('/', (req, res) => {
+  res.send('☕ Cafe Connect API is running!');
+});
+
+/**
+ * @swagger
+ * /api/menu:
+ *   get:
+ *     summary:
+ *     description:
+ *     responses:
+ *       200:
+ *         description: A list of menu items
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ */
 // GET API to fetch menu list
 app.get('/api/menu', async (req, res) => {
   try {
@@ -53,5 +74,6 @@ app.get('/api/menu', async (req, res) => {
 
 // Start server
 app.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
+  //console.log(`Server is running on http://localhost:${port}`);
+  console.log(`🚀 Server running at ${process.env.NODE_ENV == 'production' ? process.env.PROD_API_URL : 'http://localhost:' + port}`);
 });
