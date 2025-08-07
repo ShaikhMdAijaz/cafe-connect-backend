@@ -64,12 +64,121 @@ app.get('/api/menu', async (req, res) => {
   try {
     //const result = await pool.query('SELECT * FROM "Menu" ORDER BY "SeqNo" ASC');
     //const result = await pool.query('SELECT * FROM get_menu_list() ORDER BY "SeqNo" DESC');
-    const result = await pool.query('SELECT * FROM get_menu_list()');
+    const result = await pool.query('SELECT * FROM getmenulist()');
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching menu:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
+});
+
+/**
+ * @swagger
+ * /api/user/{userID}:
+ *   get:
+ *     summary:
+ *     description:
+ *      tags:
+ *       - User
+ *      parameters:
+ *       - in: path
+ *         name: userID
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: The ID of the user to retrieve
+ *     responses:
+ *       200:
+ *         description: 
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: integer
+ */
+// GET API to fetch user list
+app.get('/api/user/:userID', async (req, res) => {
+  const userID = parseInt(req.params.userID);
+
+  if (isNaN(userID)) {
+    return res.status(400).json({ error: 'Invalid user ID' });
+  }
+  try {
+    const result = await pool.query('SELECT * FROM getuserslist($1)',[userID]);
+    if (result.rows.length == 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.json(result.rows[0]);
+  } 
+  catch (error) {
+    console.error('Error fetching user:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+//User insert api start
+/**
+ * @swagger
+ * /login:
+ *   post:
+ *     summary: 
+ *     tags:
+ *       - User
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - userName
+ *               - userMobileNo
+ *               - otp
+ *               - token
+ *             properties:
+ *               userName:
+ *                 type: string
+ *                 example: 
+ *               userMobileNo:
+ *                 type: string
+ *                 example: 
+ *               otp:
+ *                 type: string
+ *                 example: 
+ *               token:
+ *                 type: string
+ *                 example: 
+ *               email:
+ *                 type: string
+ *                 example: 
+ *     responses:
+ *       200:
+ *         description: User data inserted successfully
+ *       400:
+ *         description: Missing or invalid parameters
+ */
+
+app.post('/login', (req, res) => {
+  const { userName, userMobileNo, otp, token, email } = req.body;
+
+  if (!userName || !userMobileNo || !otp || !token) {
+    return res.status(400).json({ message: 'Missing required fields' });
+  }
+
+  // Simulate insertion (in real app, insert into DB here)
+  const newUser = {
+    userName,
+    userMobileNo,
+    otp,
+    token,
+    email: email || null,
+  };
+
+  console.log('User inserted:', newUser);
+
+  return res.status(200).json({ message: 'User data inserted successfully', data: newUser });
 });
 
 // Start server
