@@ -49,6 +49,8 @@ app.get('/', (req, res) => {
  *   get:
  *     summary:
  *     description:
+ *     tags:
+ *       - Menu List
  *     responses:
  *       200:
  *         description: A list of menu items
@@ -74,47 +76,91 @@ app.get('/api/menu', async (req, res) => {
 
 /**
  * @swagger
- * /api/user/{userID}:
+ * /api/user/{valueID}:
  *   get:
  *     summary:
- *     description:
- *      tags:
+ *     description: Get user information by EmailID or MobileNo
+ *     tags:
  *       - User
- *      parameters:
+ *     parameters:
  *       - in: path
- *         name: userID
+ *         name: valueID
  *         required: true
  *         schema:
- *           type: integer
- *         description: The ID of the user to retrieve
+ *           type: string
+ *         description: EmailID or MobileNo of the user to retrieve
  *     responses:
  *       200:
- *         description: 
+ *         description: Successful response
  *         content:
  *           application/json:
  *             schema:
  *               type: object
- *               properties:
- *                 id:
- *                   type: integer
  */
 // GET API to fetch user list
-app.get('/api/user/:userID', async (req, res) => {
-  const userID = parseInt(req.params.userID);
+// app.get('/api/user/:userID', async (req, res) => {
+//   const userID = parseInt(req.params.userID);
 
-  if (isNaN(userID)) {
-    return res.status(400).json({ error: 'Invalid user ID' });
+//   if (isNaN(userID)) {
+//     return res.status(400).json({statusCode: 400 ,data: {}, error: 'Invalid user ID' });
+//   }
+//   try {
+//     const result = await pool.query('SELECT * FROM getuserslist($1)',[userID]);
+//     if (result.rows.length == 0) {
+//       return res.status(200).json({statusCode: 400 ,data: {}, error: 'User not found' });
+//     }
+//     res.status(200).json({statusCode: 200 ,data: result.rows[0], error: '' });
+//   } 
+//   catch (error) {
+//     console.error('Error fetching user:', error);
+//     res.status(500).json({ error: 'Internal Server Error' });
+//   }
+// });
+
+app.get('/api/user/:valueID', async (req, res) => {
+  const valueID = req.params.valueID?.trim();
+
+  if (!valueID) {
+    return res.status(400).json({
+      statusCode: 400,
+      data: {},
+      error: 'Missing valueID (email or mobile number)',
+    });
   }
+
   try {
-    const result = await pool.query('SELECT * FROM getuserslist($1)',[userID]);
-    if (result.rows.length == 0) {
-      return res.status(404).json({ error: 'User not found' });
+    // Decide query type: mobile or email
+    let query;
+    if (/^[6-9]\d{9}$/.test(valueID) || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valueID)) {
+      query = 'SELECT * FROM getuserslist($1)'; // expects mobile and email in DB
     }
-    res.json(result.rows[0]);
+    else {
+      return res.status(400).json({
+        statusCode: 400,
+        data: {},
+        error: 'Invalid email or mobile number format',
+      });
+    }
+
+    const result = await pool.query(query, [valueID]);
+
+    if (result.rows.length == 0) {
+      return res.status(200).json({
+        statusCode: 400,
+        data: {},
+        error: 'User not found',
+      });
+    }
+
+    res.status(200).json({
+      statusCode: 200,
+      data: result.rows[0],
+      error: '',
+    });
   } 
   catch (error) {
     console.error('Error fetching user:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({statusCode: 500, data: {}, error: 'Internal Server Error' });
   }
 });
 
@@ -167,18 +213,24 @@ app.post('/login', (req, res) => {
     return res.status(400).json({ message: 'Missing required fields' });
   }
 
-  // Simulate insertion (in real app, insert into DB here)
-  const newUser = {
-    userName,
-    userMobileNo,
-    otp,
-    token,
-    email: email || null,
-  };
-
-  console.log('User inserted:', newUser);
-
-  return res.status(200).json({ message: 'User data inserted successfully', data: newUser });
+  try{
+    // Simulate insertion (in real app, insert into DB here)
+    const newUser = {
+      userName,
+      userMobileNo,
+      otp,
+      token,
+      email: email || null,
+    };
+  
+    console.log('User inserted:', newUser);
+  
+    return res.status(200).json({statusCode: 200 ,message: 'User data inserted successfully', data: newUser });
+  }
+  catch (error) {
+    console.error('Error fetching menu:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
 });
 
 // Start server
@@ -186,3 +238,7 @@ app.listen(port, () => {
   //console.log(`Server is running on http://localhost:${port}`);
   console.log(`🚀 Server running at ${process.env.NODE_ENV == 'production' ? process.env.PROD_API_URL : 'http://localhost:' + port}`);
 });
+
+//Filllist api
+//cart insert and get api
+//addressdtl insert and get api
