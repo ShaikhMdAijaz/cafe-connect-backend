@@ -67,10 +67,12 @@ app.get('/api/menu', async (req, res) => {
     //const result = await pool.query('SELECT * FROM "Menu" ORDER BY "SeqNo" ASC');
     //const result = await pool.query('SELECT * FROM get_menu_list() ORDER BY "SeqNo" DESC');
     const result = await pool.query('SELECT * FROM getmenulist()');
-    res.json(result.rows);
-  } catch (error) {
+    //res.json(result.rows);
+    res.status(200).json({statusCode: 200,data: result.rows,error: ''});
+  } 
+  catch (error) {
     console.error('Error fetching menu:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ statusCode: 500,error: error });
   }
 });
 
@@ -122,9 +124,7 @@ app.get('/api/user/:valueID', async (req, res) => {
 
   if (!valueID) {
     return res.status(400).json({
-      statusCode: 400,
-      data: {},
-      error: 'Missing valueID (email or mobile number)',
+      statusCode: 400,data: {},error: 'Missing valueID (email or mobile number)',
     });
   }
 
@@ -136,9 +136,7 @@ app.get('/api/user/:valueID', async (req, res) => {
     }
     else {
       return res.status(400).json({
-        statusCode: 400,
-        data: {},
-        error: 'Invalid email or mobile number format',
+        statusCode: 400,data: {},error: 'Invalid email or mobile number format',
       });
     }
 
@@ -146,28 +144,24 @@ app.get('/api/user/:valueID', async (req, res) => {
 
     if (result.rows.length == 0) {
       return res.status(200).json({
-        statusCode: 400,
-        data: {},
-        error: 'User not found',
+        statusCode: 400,data: {},error: 'User not found',result : result
       });
     }
 
     res.status(200).json({
-      statusCode: 200,
-      data: result.rows[0],
-      error: '',
+      statusCode: 200,data: result.rows[0],error: '',
     });
   } 
   catch (error) {
     console.error('Error fetching user:', error);
-    res.status(500).json({statusCode: 500, data: {}, error: 'Internal Server Error' });
+    res.status(500).json({statusCode: 500, data: {}, error: error });
   }
 });
 
-//User insert api start
+//POST API to insert data into table
 /**
  * @swagger
- * /login:
+ * /api/login:
  *   post:
  *     summary: 
  *     tags:
@@ -206,32 +200,350 @@ app.get('/api/user/:valueID', async (req, res) => {
  *         description: Missing or invalid parameters
  */
 
-app.post('/login', (req, res) => {
+app.post('/api/login',async (req, res) => {
   const { userName, userMobileNo, otp, token, email } = req.body;
 
   if (!userName || !userMobileNo || !otp || !token) {
-    return res.status(400).json({ message: 'Missing required fields' });
+    return res.status(400).json({ error: 'Missing required fields' });
   }
 
   try{
     // Simulate insertion (in real app, insert into DB here)
-    const newUser = {
-      userName,
-      userMobileNo,
-      otp,
-      token,
-      email: email || null,
-    };
+    // const newUser = {
+    //   userName,
+    //   userMobileNo,
+    //   otp,
+    //   token,
+    //   email: email || null,
+    // };
+
+     const  result  = await pool.query(
+      `SELECT * FROM insertuser($1,$2,$3,$4,$5)`,[userName, userMobileNo, otp, token, email]
+    );
   
-    console.log('User inserted:', newUser);
-  
-    return res.status(200).json({statusCode: 200 ,message: 'User data inserted successfully', data: newUser });
+    if((result.rows[0].errorMsg != '' && result.rows[0].errorMsg != null) || result.rows[0].id == 0){
+      return res.status(200).json({statusCode: 400,data: {},error: result.rows[0].errorMsg,result : result});
+    }
+    return res.status(200).json({statusCode: 200 ,message: 'User data inserted successfully', data: result.rows[0], error : '' });
+    //console.log('User inserted:', newUser);  
+    //return res.status(200).json({statusCode: 200 ,message: 'User data inserted successfully', data: newUser });
   }
   catch (error) {
     console.error('Error fetching menu:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ statusCode: 500 , error: error });
   }
 });
+
+//Filllist
+/**
+ * @swagger
+ * /api/state/filllist:
+ *   get:
+ *     summary:
+ *     description:
+ *     tags:
+ *       - Filllist
+ *     responses:
+ *       200:
+ *         description: List of states list
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ */
+app.get('/api/state/filllist', async (req, res) => {
+  try {
+    //const status = req.query.status || 1;
+    const  result  = await pool.query('SELECT * FROM getfilllist()');
+    //res.json(rows);
+    if (result.rows.length == 0) {
+      return res.status(200).json({
+        statusCode: 400,data: {},error: 'States list not found',result : result
+      });
+    }
+    res.status(200).json({statusCode: 200, data: result.rows, error: '',result : result});
+  } 
+  catch (err) {
+    console.error(err);
+    res.status(500).json({statusCode: 500, data:{} ,error: err });
+  }
+});
+
+//GET API to fetch useraddressdtl
+/**
+ * @swagger
+ * /api/user/address/{userID}:
+ *   get:
+ *     summary: 
+ *     description: 
+ *     tags:
+ *       - User Address
+ *     parameters:
+ *       - in: path
+ *         name: userID
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: User ID
+ *     responses:
+ *       200:
+ *         description: List of user addresses
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *       400:
+ *         description: Invalid user ID
+ *       500:
+ *         description: Server error
+ */
+app.get('/api/user/address/:userID', async (req, res) => {
+  const { userID } = req.params;
+
+  if (!userID || isNaN(userID)) {
+    return res.status(200).json({ statusCode: 400, data: {},error: 'Invalid user ID' });
+  }
+
+  try {
+    const result = await pool.query(`SELECT * FROM getusersaddressdtl($1)`,[userID]);
+      if (result.rows.length == 0) {
+      return res.status(200).json({
+        statusCode: 400,data: {},error: 'User Address not found',result:result
+      });
+    }
+    res.status(200).json({statusCode: 200, data: result.rows, error: '',});
+  } 
+  catch (err) {
+    console.error('Error fetching user address:', err);
+    res.status(500).json({ statusCode: 500, data: {},error: err });
+  }
+});
+
+//GET API to fetch usercartdtl
+/**
+ * @swagger
+ * /api/user/cart/{userID}:
+ *   get:
+ *     summary:
+ *     description:
+ *     tags:
+ *       - User Cart
+ *     parameters:
+ *       - in: path
+ *         name: userID
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID of the user
+ *     responses:
+ *       200:
+ *         description: 
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *       500:
+ *         description: Internal server error
+ */
+app.get('/api/user/cart/:userID', async (req, res) => {
+  const { userID } = req.params;
+  if (!userID || isNaN(userID)) {
+    return res.status(200).json({ statusCode: 400, data: {},error: 'Invalid user ID' });
+  }
+  try {
+    const result = await pool.query('SELECT * FROM getuserscartlist($1)', [userID]);
+    if (result.rows.length == 0) {
+      return res.status(200).json({
+        statusCode: 400,data: {},error: 'User Cart not found',result:result
+      });
+    }
+    res.status(200).json({statusCode: 200, data: result.rows, error: '',});
+  } 
+  catch (err) {
+    console.error(err);
+    res.status(500).json({statusCode: 500, data: {},error: err });
+  }
+});
+
+//POST API for UserCartDtl
+/**
+ * @swagger
+ * /api/users/cart:
+ *   post:
+ *     summary:
+ *     description:
+ *     tags: 
+ *        - User Cart 
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               userID:
+ *                 type: integer
+ *               menuID:
+ *                 type: integer
+ *               type:
+ *                 type: string
+ *               subType:
+ *                 type: string
+ *               code:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               rate:
+ *                 type: integer
+ *               qty:
+ *                 type: integer
+ *               image:
+ *                 type: string
+ *               seqNo:
+ *                 type: integer
+ *             required:
+ *               - userID
+ *               - menuID
+ *               - type
+ *               - subType
+ *               - code
+ *               - description
+ *               - rate
+ *               - qty
+ *               - image
+ *     responses:
+ *       200:
+ *         description: Insert result
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 errorMsg:
+ *                   type: string
+ *                 usersCartDtlID:
+ *                   type: integer
+ */
+app.post('/api/users/cart', async (req, res) => {
+  const {userID,menuID,type,subType,code,description,rate,qty,image,seqNo,} = req.body;
+  if ((!userID || isNaN(userID)) || (!menuID || isNaN(menuID)) || !type || !subType || !code || !description || (!rate || isNaN(rate))|| (!qty || isNaN(qty))|| !image) {
+    return res.status(400).json({statusCode: 400,error: 'Missing required fields' });
+  }
+  try {
+    const result = await pool.query(
+      'SELECT * FROM insertuserscartdtl($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
+      [userID, menuID, type, subType, code, description, rate, qty, image, seqNo]
+    );
+
+    //res.json(result.rows[0]); // Will return { errorMsg, usersCartDtlID }    
+    if((result.rows[0].errorMsg != '' && result.rows[0].errorMsg != null) || result.rows[0].usersCartDtlID == 0){
+      return res.status(200).json({statusCode: 400,data: {},error: result.rows[0].errorMsg,result : result});
+    }
+    return res.status(200).json({statusCode: 200 ,message: 'User Cart inserted successfully', data: result.rows[0], error : '' });
+  } 
+  catch (err) {
+    console.error(err);
+    res.status(500).json({ statusCode: 500, data: {},error: err });
+  }
+});
+
+//POST API for useraddressdtl
+/**
+ * @swagger
+ * /api/users/address:
+ *   post:
+ *     summary:
+ *     tags: [User Address]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               userID:
+ *                 type: integer
+ *                 example: 1
+ *               addressType:
+ *                 type: string
+ *                 example: Home
+ *               fullName:
+ *                 type: string
+ *                 example: John Doe
+ *               mobileNo:
+ *                 type: string
+ *                 example: 9876543210
+ *               pincode:
+ *                 type: string
+ *                 example: 400001
+ *               houseNo:
+ *                 type: string
+ *                 example: A-101
+ *               area:
+ *                 type: string
+ *                 example: Andheri East
+ *               landmark:
+ *                 type: string
+ *                 example: Near Mall
+ *               city:
+ *                 type: string
+ *                 example: Mumbai
+ *               state:
+ *                 type: string
+ *                 example: Maharashtra
+ *               isDefaultAddress:
+ *                 type: boolean
+ *                 example: true
+ *     responses:
+ *       200:
+ *         description: Address added successfully and list returned
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 errorMsg:
+ *                   type: string
+ *                 usersCartDtlID:
+ *                   type: integer
+ */
+app.post('/api/users/address', async (req, res) => {
+  const {userID, addressType, fullName, mobileNo, pincode,houseNo, area, landmark, city, state, isDefaultAddress} = req.body;
+  if ((!userID || isNaN(userID)) || !addressType || !fullName || !mobileNo || !pincode || !houseNo || !area || !landmark || !city || !state || !isDefaultAddress) {
+    return res.status(400).json({statusCode: 400,error: 'Missing required fields' });
+  }
+  try {
+    // Insert into UsersAddressDtl
+   const result =  await pool.query(`
+      SELECT * FROM insertusersaddressdtl($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    `, [userID, addressType, fullName, mobileNo, pincode,
+      houseNo, area, landmark, city, state, isDefaultAddress ? '1' : '0']
+  );
+
+    // Fetch updated list using your function
+    //const { rows } = await pool.query(`SELECT * FROM getusersaddressdtl($1)`, [userID]);
+    if((result.rows[0].errorMsg != '' && result.rows[0].errorMsg != null) || result.rows[0].usersAddressDtlID == 0){
+      return res.status(200).json({statusCode: 400,data: {},error: result.rows[0].errorMsg,result : result});
+    }
+    //res.json({success: true,message: "Address added successfully",addresses: rows});
+    return res.status(200).json({statusCode: 200 ,message: 'Address inserted successfully', data: result.rows[0], error : '' });
+
+  } 
+  catch (err) {
+    //console.error("Error inserting address:", err.message);
+    //res.status(500).json({success: false,error: err.message});
+    res.status(500).json({ statusCode: 500, data: {},error: err });
+  }
+});
+
 
 // Start server
 app.listen(port, () => {
